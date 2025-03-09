@@ -112,14 +112,12 @@ def create_and_run_bot(email: str, password: str, parameters: dict, openai_api_k
         pdf_base64_data = resume_generator_manager.pdf_base64()
         print("📄 PDF Resume Generated Successfully.")
 
-        job_application_profile_object = JobApplicationProfile(plain_text_resume)
-
         print("🌐 Initializing Browser...")
         browser = init_browser()
         login_component = LinkedInAuthenticator(browser)
         gpt_answerer_component = GPTAnswerer(openai_api_key)  # ✅ Use API key from secrets.yaml
         job_application_profile_object = JobApplicationProfile(plain_text_resume)  # ✅ Create job profile
-        apply_component = LinkedInJobManager(browser, gpt_answerer_component, job_application_profile_object)
+        apply_component = LinkedInJobManager(browser, gpt_answerer_component, job_application_profile_object, resume_generator_manager)
 
         print("🤖 Setting up LinkedIn Bot...")
         bot = LinkedInBotFacade(login_component, apply_component)
