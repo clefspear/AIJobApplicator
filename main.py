@@ -117,7 +117,7 @@ def create_and_run_bot(email: str, password: str, parameters: dict, openai_api_k
         print("🌐 Initializing Browser...")
         browser = init_browser()
         login_component = LinkedInAuthenticator(browser)
-        apply_component = LinkedInJobManager(browser)
+        apply_component = LinkedInJobManager(browser, gpt_answerer_component, job_application_profile_object)
 
         gpt_answerer_component = GPTAnswerer(openai_api_key)
 
