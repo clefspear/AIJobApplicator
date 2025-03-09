@@ -94,14 +94,24 @@ class LinkedInJobManager:
         
         try:
             job_results = WebDriverWait(self.driver, 10).until(
-            EC.presence_of_element_located((By.CLASS_NAME, "jobs-search-results-list"))
+                EC.presence_of_element_located((By.CLASS_NAME, "scaffold-layout__list-detail-container"))
             )
         except Exception:
             print("⚠️ Job results list not found. LinkedIn may have changed its layout or the page hasn't fully loaded.")
             return
         utils.scroll_slow(self.driver, job_results)
         utils.scroll_slow(self.driver, job_results, step=300, reverse=True)
-        job_list_elements = self.driver.find_elements(By.CLASS_NAME, 'scaffold-layout__list-container')[0].find_elements(By.CLASS_NAME, 'jobs-search-results__list-item')
+        # Wait for the job list container to load
+        job_results = WebDriverWait(self.driver, 10).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "scaffold-layout__list-detail-container"))
+        )
+        job_list_container = self.driver.find_element(By.CLASS_NAME, "scaffold-layout__list-detail-container")
+        job_list_elements = job_list_container.find_elements(By.TAG_NAME, "li")  # Jobs are inside <li> tags
+        
+        # Debugging: Print extracted jobs
+        for job in job_list_elements:
+            print(job.text)  # Verify that jobs are being detected
+            
         if not job_list_elements:
                 print("⚠️ No job listings found on this page. Moving to the next page...")
                 return
@@ -222,18 +232,37 @@ class LinkedInJobManager:
 
     def get_base_search_url(self, parameters):
         url_parts = []
+        
         if parameters['remote']:
             url_parts.append("f_CF=f_WRA")
         if parameters['onsite']:
             url_parts.append("f_CF=f_ON")
+
         experience_levels = [str(i+1) for i, (level, v) in enumerate(parameters.get('experienceLevel', {}).items()) if v]
         if experience_levels:
             url_parts.append(f"f_E={','.join(experience_levels)}")
+
         url_parts.append(f"distance={parameters['distance']}")
+
         job_types = [key[0].upper() for key, value in parameters.get('jobTypes', {}).items() if value]
         if job_types:
             url_parts.append(f"f_JT={','.join(job_types)}")
-        url_parts.append("f_LF=f_AL")
+
+        # ✅ Add Date Filtering Logic
+        date_filter_map = {
+            "all time": None,
+            "month": "f_TPR=r2592000",
+            "week": "f_TPR=r604800",
+            "24 hours": "f_TPR=r86400"  # ✅ This is the filter for last 24 hours
+        }
+        
+        for key, value in parameters.get('date', {}).items():
+            if value and key in date_filter_map:
+                date_filter = date_filter_map[key]
+                if date_filter:
+                    url_parts.append(date_filter)
+                break  # Only apply the first matched filter
+
         return f"?{'&'.join(url_parts)}"
 
     def next_job_page(self, position, location, job_page):
