@@ -84,6 +84,28 @@ class LinkedInJobManager:
                 print(f"⚠️ Error processing jobs: {e}")
                 continue
 
+    def extract_job_information_from_tile(self, job_element):
+        """Extracts job information from a LinkedIn job tile."""
+        try:
+            title = job_element.find_element(By.CSS_SELECTOR, "h3").text
+            company = job_element.find_element(By.CSS_SELECTOR, "h4").text
+            location = job_element.find_element(By.CSS_SELECTOR, "span.job-search-card__location").text
+            job_link = job_element.find_element(By.TAG_NAME, "a").get_attribute("href")
+
+            # Determine if Easy Apply is available
+            try:
+                easy_apply = job_element.find_element(By.CLASS_NAME, "job-card-container__apply-method").text
+                apply_method = "Easy Apply" if "Easy Apply" in easy_apply else "Standard"
+            except NoSuchElementException:
+                apply_method = "Standard"
+
+            return title, company, location, job_link, apply_method
+
+        except Exception as e:
+            print(f"⚠️ Error extracting job info: {e}")
+            return None, None, None, None, None
+
+
     def apply_jobs(self):
         try:
             no_jobs_element = self.driver.find_element(By.CLASS_NAME, 'jobs-search-two-pane__no-results-banner--expand')
