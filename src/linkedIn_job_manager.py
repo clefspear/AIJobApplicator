@@ -4,9 +4,9 @@ import time
 import traceback
 from itertools import product
 from pathlib import Path
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from src.gpt import GPTAnswerer
 import src.strings as strings
@@ -85,14 +85,18 @@ class LinkedInJobManager:
                 continue
 
     def extract_job_information_from_tile(self, job_element):
-        """Extracts job information from a LinkedIn job tile."""
+        """Extracts job information from a LinkedIn job tile based on the updated HTML structure."""
         try:
-            title = job_element.find_element(By.CSS_SELECTOR, "h3").text
-            company = job_element.find_element(By.CSS_SELECTOR, "h4").text
+            # Wait until the job title appears
+            wait = WebDriverWait(self.driver, 5)  # 5-second timeout
+
+            # Update selectors based on the new structure
+            title = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "span.job-card-list__title"))).text
+            company = job_element.find_element(By.CSS_SELECTOR, "span.job-card-container__company-name").text
             location = job_element.find_element(By.CSS_SELECTOR, "span.job-search-card__location").text
             job_link = job_element.find_element(By.TAG_NAME, "a").get_attribute("href")
 
-            # Determine if Easy Apply is available
+            # Check if "Easy Apply" is present
             try:
                 easy_apply = job_element.find_element(By.CLASS_NAME, "job-card-container__apply-method").text
                 apply_method = "Easy Apply" if "Easy Apply" in easy_apply else "Standard"
@@ -101,9 +105,14 @@ class LinkedInJobManager:
 
             return title, company, location, job_link, apply_method
 
+        except TimeoutException:
+            print(f"⚠️ Timeout: The job information elements did not load in time.")
+        except NoSuchElementException:
+            print(f"⚠️ Error: Could not find job title or other elements. LinkedIn may have changed its structure.")
         except Exception as e:
-            print(f"⚠️ Error extracting job info: {e}")
-            return None, None, None, None, None
+            print(f"⚠️ Unexpected error extracting job info: {e}")
+
+        return None, None, None, None, None
 
 
     def apply_jobs(self):
