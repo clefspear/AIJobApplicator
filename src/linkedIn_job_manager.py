@@ -4,6 +4,8 @@ import time
 import traceback
 from itertools import product
 from pathlib import Path
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from src.gpt import GPTAnswerer
@@ -29,10 +31,11 @@ class EnvironmentKeys:
         return os.getenv(key) == "True"
 
 class LinkedInJobManager:
-    def __init__(self, driver, gpt_answerer, job_application_profile):
+    def __init__(self, driver, gpt_answerer, job_application_profile, resume_generator_manager):
         self.driver = driver
         self.gpt_answerer = gpt_answerer
         self.job_application_profile = job_application_profile
+        self.resume_generator_manager = resume_generator_manager  # ✅ Store resume generator
         self.set_old_answers = set()
         self.easy_applier_component = None
 
