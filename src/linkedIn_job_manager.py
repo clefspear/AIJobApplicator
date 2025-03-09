@@ -39,13 +39,9 @@ class LinkedInJobManager:
         self.base_search_url = self.get_base_search_url(parameters)
         self.seen_jobs = []
         resume_path = parameters.get('uploads', {}).get('resume', None)
-        if resume_path is not None and Path(resume_path).exists():
-            self.resume_path = Path(resume_path)
-        else:
-            self.resume_path = None
+        self.resume_path = Path(resume_path) if resume_path and Path(resume_path).exists() else None
         self.output_file_directory = Path(parameters['outputFileDirectory'])
         self.env_config = EnvironmentKeys()
-        #self.old_question()
 
     def set_gpt_answerer(self, gpt_answerer):
         self.gpt_answerer = gpt_answerer
@@ -54,52 +50,31 @@ class LinkedInJobManager:
         self.resume_generator_manager = resume_generator_manager
 
     def start_applying(self):
-        self.easy_applier_component = LinkedInEasyApplier(self.driver, self.resume_path, self.set_old_answers, self.gpt_answerer, self.resume_generator_manager)
+        self.easy_applier_component = LinkedInEasyApplier(
+            self.driver, self.resume_path, self.set_old_answers, self.gpt_answerer, self.resume_generator_manager
+        )
         searches = list(product(self.positions, self.locations))
         random.shuffle(searches)
-        page_sleep = 0
-        minimum_time = 60 * 15
-        minimum_page_time = time.time() + minimum_time
 
         for position, location in searches:
             location_url = "&location=" + location
             job_page_number = -1
-            utils.printyellow(f"Starting the search for {position} in {location}.")
+            utils.printyellow(f"🚀 Starting the search for {position} in {location}.")
 
             try:
                 while True:
-                    page_sleep += 1
                     job_page_number += 1
-                    utils.printyellow(f"Going to job page {job_page_number}")
+                    utils.printyellow(f"🔍 Going to job page {job_page_number}")
                     self.next_job_page(position, location_url, job_page_number)
                     time.sleep(random.uniform(1.5, 3.5))
-                    utils.printyellow("Starting the application process for this page...")
+                    utils.printyellow("📝 Starting the application process for this page...")
                     self.apply_jobs()
-                    utils.printyellow("Applying to jobs on this page has been completed!")
+                    utils.printyellow("✅ Applying to jobs on this page has been completed!")
 
-                    time_left = minimum_page_time - time.time()
-                    if time_left > 0:
-                        utils.printyellow(f"Sleeping for {time_left} seconds.")
-                        time.sleep(time_left)
-                        minimum_page_time = time.time() + minimum_time
-                    if page_sleep % 5 == 0:
-                        sleep_time = random.randint(5, 34)
-                        utils.printyellow(f"Sleeping for {sleep_time / 60} minutes.")
-                        time.sleep(sleep_time)
-                        page_sleep += 1
-            except Exception:
-                traceback.format_exc()
-                pass
-            time_left = minimum_page_time - time.time()
-            if time_left > 0:
-                utils.printyellow(f"Sleeping for {time_left} seconds.")
-                time.sleep(time_left)
-                minimum_page_time = time.time() + minimum_time
-            if page_sleep % 5 == 0:
-                sleep_time = random.randint(50, 90)
-                utils.printyellow(f"Sleeping for {sleep_time / 60} minutes.")
-                time.sleep(sleep_time)
-                page_sleep += 1
+                    time.sleep(random.randint(10, 30))
+            except Exception as e:
+                print(f"⚠️ Error processing jobs: {e}")
+                continue
 
     def apply_jobs(self):
         try:
@@ -118,7 +93,7 @@ class LinkedInJobManager:
         job_list = [Job(*self.extract_job_information_from_tile(job_element)) for job_element in job_list_elements] 
         for job in job_list:
             if self.is_blacklisted(job.title, job.company, job.link):
-                utils.printyellow(f"Blacklisted {job.title} at {job.company}, skipping...")
+                utils.printyellow(f"🚫 Blacklisted {job.title} at {job.company}, skipping...")
                 self.write_to_file(job, "skipped")
                 continue
             try:
@@ -129,17 +104,29 @@ class LinkedInJobManager:
                 utils.printred(traceback.format_exc())
                 self.write_to_file(job, "failed")
                 continue
-        
+
+    def handle_external_application(self, job):
+        print(f"\n🌍 Applying on external site for: {job.title} at {job.company}")
+        self.driver.get(job.link)
+        time.sleep(random.uniform(3, 5))
+
+        if "workday" in self.driver.current_url:
+            print("✅ Detected Workday ATS.")
+        elif "lever" in self.driver.current_url:
+            print("✅ Detected Lever ATS.")
+        elif "greenhouse" in self.driver.current_url:
+            print("✅ Detected Greenhouse ATS.")
+        else:
+            print(f"⚠️ Unknown ATS detected for {job.title}. Manual application required.")
+
     def write_to_file(self, job, file_name):
-        pdf_path = Path(job.pdf_path).resolve()
-        pdf_path = pdf_path.as_uri()
         data = {
             "company": job.company,
             "job_title": job.title,
             "link": job.link,
             "job_recruiter": job.recruiter_link,
             "job_location": job.location,
-            "pdf_path": pdf_path
+            "pdf_path": Path(job.pdf_path).resolve().as_uri(),
         }
         file_path = self.output_file_directory / f"{file_name}.json"
         if not file_path.exists():
@@ -160,6 +147,8 @@ class LinkedInJobManager:
         url_parts = []
         if parameters['remote']:
             url_parts.append("f_CF=f_WRA")
+        if parameters['onsite']:
+            url_parts.append("f_CF=f_ON")
         experience_levels = [str(i+1) for i, (level, v) in enumerate(parameters.get('experienceLevel', {}).items()) if v]
         if experience_levels:
             url_parts.append(f"f_E={','.join(experience_levels)}")
@@ -167,42 +156,15 @@ class LinkedInJobManager:
         job_types = [key[0].upper() for key, value in parameters.get('jobTypes', {}).items() if value]
         if job_types:
             url_parts.append(f"f_JT={','.join(job_types)}")
-        date_mapping = {
-            "all time": "",
-            "month": "&f_TPR=r2592000",
-            "week": "&f_TPR=r604800",
-            "24 hours": "&f_TPR=r86400"
-        }
-        date_param = next((v for k, v in date_mapping.items() if parameters.get('date', {}).get(k)), "")
-        url_parts.append("f_LF=f_AL")  # Easy Apply
-        base_url = "&".join(url_parts)
-        return f"?{base_url}{date_param}"
-    
+        url_parts.append("f_LF=f_AL")
+        return f"?{'&'.join(url_parts)}"
+
     def next_job_page(self, position, location, job_page):
         self.driver.get(f"https://www.linkedin.com/jobs/search/{self.base_search_url}&keywords={position}{location}&start={job_page * 25}")
-    
-    def extract_job_information_from_tile(self, job_tile):
-        job_title, company, job_location, apply_method, link = "", "", "", "", ""
-        try:
-            job_title = job_tile.find_element(By.CLASS_NAME, 'job-card-list__title').text
-            link = job_tile.find_element(By.CLASS_NAME, 'job-card-list__title').get_attribute('href').split('?')[0]
-            company = job_tile.find_element(By.CLASS_NAME, 'job-card-container__primary-description').text
-        except:
-            pass
-        try:
-            job_location = job_tile.find_element(By.CLASS_NAME, 'job-card-container__metadata-item').text
-        except:
-            pass
-        try:
-            apply_method = job_tile.find_element(By.CLASS_NAME, 'job-card-container__apply-method').text
-        except:
-            apply_method = "Applied"
 
-        return job_title, company, job_location, link, apply_method
-    
     def is_blacklisted(self, job_title, company, link):
-        job_title_words = job_title.lower().split(' ')
-        title_blacklisted = any(word in job_title_words for word in self.title_blacklist)
-        company_blacklisted = company.strip().lower() in (word.strip().lower() for word in self.company_blacklist)
-        link_seen = link in self.seen_jobs
-        return title_blacklisted or company_blacklisted or link_seen
+        return any([
+            job_title.lower() in self.title_blacklist,
+            company.lower() in self.company_blacklist,
+            link in self.seen_jobs
+        ])
