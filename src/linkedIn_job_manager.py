@@ -6,6 +6,9 @@ from itertools import product
 from pathlib import Path
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
+from src.gpt import GPTAnswerer
+import src.strings as strings
+from src.job_application_profile import JobApplicationProfile
 import src.utils as utils
 from src.job import Job
 from src.linkedIn_easy_applier import LinkedInEasyApplier
@@ -26,8 +29,10 @@ class EnvironmentKeys:
         return os.getenv(key) == "True"
 
 class LinkedInJobManager:
-    def __init__(self, driver):
+    def __init__(self, driver, gpt_answerer, job_application_profile):
         self.driver = driver
+        self.gpt_answerer = gpt_answerer
+        self.job_application_profile = job_application_profile
         self.set_old_answers = set()
         self.easy_applier_component = None
 
@@ -84,12 +89,19 @@ class LinkedInJobManager:
         except NoSuchElementException:
             pass
         
-        job_results = self.driver.find_element(By.CLASS_NAME, "jobs-search-results-list")
+        try:
+            job_results = WebDriverWait(self.driver, 10).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "jobs-search-results-list"))
+            )
+        except Exception:
+            print("⚠️ Job results list not found. LinkedIn may have changed its layout or the page hasn't fully loaded.")
+            return
         utils.scroll_slow(self.driver, job_results)
         utils.scroll_slow(self.driver, job_results, step=300, reverse=True)
         job_list_elements = self.driver.find_elements(By.CLASS_NAME, 'scaffold-layout__list-container')[0].find_elements(By.CLASS_NAME, 'jobs-search-results__list-item')
         if not job_list_elements:
-            raise Exception("No job class elements found on page")
+                print("⚠️ No job listings found on this page. Moving to the next page...")
+                return
         job_list = [Job(*self.extract_job_information_from_tile(job_element)) for job_element in job_list_elements] 
         for job in job_list:
             if self.is_blacklisted(job.title, job.company, job.link):
@@ -104,21 +116,83 @@ class LinkedInJobManager:
                 utils.printred(traceback.format_exc())
                 self.write_to_file(job, "failed")
                 continue
+    def _handle_standard_apply(self, job, resume_text, cover_letter_text):
+        try:
+            print("Redirecting to an external application site.")
+            WebDriverWait(self.driver, 10).until(
+                lambda d: "apply" in d.current_url or "careers" in d.current_url
+            )
+
+            try:
+                resume_input = self.driver.find_element(By.XPATH, "//input[@type='file']")
+                resume_input.send_keys(resume_text)
+            except Exception:
+                print("No resume upload field found.")
+
+            try:
+                cover_letter_field = self.driver.find_element(By.XPATH, "//textarea[contains(@name, 'coverLetter')]")
+                cover_letter_field.send_keys(strings.coverletter_template.format(job_description=job.description, resume=resume_text))
+            except Exception:
+                print("No cover letter field found.")
+
+            try:
+                self._fill_application_fields()
+            except Exception as e:
+                print(f"Error filling application fields: {e}")
+
+            try:
+                submit_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Submit') or contains(text(), 'Apply')]")
+                submit_button.click()
+                print(f"Successfully applied to {job.title} at {job.company} via standard apply.")
+            except Exception:
+                print("Could not submit application. Manual review needed.")
+        except Exception as e:
+            print(f"Error handling external application: {e}")
 
     def handle_external_application(self, job):
         print(f"\n🌍 Applying on external site for: {job.title} at {job.company}")
         self.driver.get(job.link)
-        time.sleep(random.uniform(3, 5))
+        WebDriverWait(self.driver, 10).until(
+            lambda d: d.execute_script("return document.readyState") == "complete"
+        )
 
-        if "workday" in self.driver.current_url:
-            print("✅ Detected Workday ATS.")
-        elif "lever" in self.driver.current_url:
-            print("✅ Detected Lever ATS.")
-        elif "greenhouse" in self.driver.current_url:
-            print("✅ Detected Greenhouse ATS.")
+        ai_cover_letter = self.gpt_answerer.generate_cover_letter(job)
+        ai_resume = self.gpt_answerer.generate_resume(job)
+
+        try:
+            apply_button = WebDriverWait(self.driver, 5).until(
+                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Apply') or contains(text(), 'Easy Apply')]"))
+            )
+            apply_button.click()
+        except Exception:
+            print("Apply button not found. Skipping application.")
+            return
+
+        time.sleep(2)
+
+        if "Easy Apply" in apply_button.text:
+            self._handle_easy_apply(job, ai_resume, ai_cover_letter)
         else:
-            print(f"⚠️ Unknown ATS detected for {job.title}. Manual application required.")
+            self._handle_standard_apply(job, ai_resume, ai_cover_letter)
+    def _fill_application_fields(self):
+        """Fills out application fields using job application profile data."""
+        fields = {
+            "gender": self.job_application_profile.self_identification.gender,
+            "pronouns": self.job_application_profile.self_identification.pronouns,
+            "work_auth": self.job_application_profile.legal_authorization.us_work_authorization,
+            "remote": self.job_application_profile.work_preferences.remote_work,
+            "relocate": self.job_application_profile.work_preferences.open_to_relocation,
+            "notice": self.job_application_profile.availability.notice_period,
+            "salary": self.job_application_profile.salary_expectations.salary_range_usd,
+        }
 
+        for field, value in fields.items():
+            try:
+                input_element = self.driver.find_element(By.NAME, field)
+                input_element.clear()
+                input_element.send_keys(value)
+            except NoSuchElementException:
+                print(f"Field {field} not found.")
     def write_to_file(self, job, file_name):
         data = {
             "company": job.company,
