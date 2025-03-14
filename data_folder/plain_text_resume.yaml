@@ -1,0 +1,144 @@
+personal_information:
+  name: 
+  surname: 
+  date_of_birth: 
+  country: 
+  city: 
+  address: 
+  zip_code: 
+  phone_prefix: 
+  phone: 
+  email: 
+  github: 
+  linkedin: 
+
+education_details:
+  - degree: 
+    university: 
+    field_of_study: 
+    start_date: 
+    gpa: 
+    graduation_year: 
+    exam: {}
+
+  - degree: 
+    university: 
+    field_of_study: 
+    start_date: 
+    graduation_year: 
+    gpa: 
+    exam: {}
+    minor: 
+
+experience_details:
+  - position: 
+    company: 
+    employment_period: 
+    location: 
+    industry: 
+    key_responsibilities:
+      - responsibility_1: 
+      - responsibility_2: 
+      - responsibility_3: 
+    skills_acquired:
+      - skill_1: 
+      - skill_2: 
+      - skill_3: 
+
+  - position: 
+    company: 
+    employment_period: 
+    location: 
+    industry: 
+    key_responsibilities:
+      - responsibility_1:  
+      - responsibility_2: 
+      - responsibility_3:  
+    skills_acquired:
+      - skill_1: 
+      - skill_2: 
+      - skill_3: 
+
+  - position: 
+    company: 
+    employment_period: 
+    location: 
+    industry: 
+    key_responsibilities:
+      - responsibility_1:  
+      - responsibility_2:  
+    skills_acquired:
+      - skill_1: 
+      - skill_2: 
+      - skill_3: 
+
+  - position: 
+    company: 
+    employment_period: 
+    location: 
+    industry: 
+    key_responsibilities:
+      - responsibility_1: 
+      - responsibility_2: 
+      - responsibility_3: 
+    skills_acquired:
+      - skill_1: 
+      - skill_2: 
+      - skill_3: 
+
+projects:
+  - name: 
+    description: 
+    link: 
+
+achievements:
+  - name: 
+    description: 
+
+certifications:
+  - name: 
+    description: 
+
+languages:
+  - language: 
+    proficiency: 
+  - language: 
+    proficiency: 
+  - language: 
+    proficiency: 
+
+interests:
+  - interest_1: 
+  - interest_2: 
+  - interest_3: 
+
+availability:
+  notice_period: 
+
+salary_expectations:
+  salary_range_usd: 
+
+self_identification:
+  gender: 
+  pronouns: 
+  veteran: 
+  disability: 
+  ethnicity: 
+
+legal_authorization:
+  us_work_authorization: 
+  eu_work_authorization: 
+  requires_us_visa: 
+  requires_us_sponsorship: 
+  requires_eu_visa: 
+  legally_allowed_to_work_in_us: 
+  legally_allowed_to_work_in_eu: 
+  requires_eu_sponsorship: 
+
+work_preferences:
+  remote_work: 
+  in_person_work: 
+  open_to_relocation: 
+  willing_to_complete_assessments: 
+  willing_to_undergo_drug_tests: 
+  willing_to_undergo_background_checks: 
