@@ -96,15 +96,17 @@ def init_browser() -> webdriver.Chrome:
         print("❌ Error: WebDriver failed to initialize. LinkedIn may be blocking automation.")
         raise RuntimeError(f"Failed to initialize browser: {str(e)}")
 
-def create_and_run_bot(email: str, password: str, parameters: dict, openai_api_key: str):
+def create_and_run_bot(email: str, password: str, parameters: dict, openai_api_key: str, plain_text_resume_file: Path):
     try:
         print("🔍 Initializing Resume Generation Components...")
         style_manager = StyleManager()
         resume_generator = ResumeGenerator()
         
-        with open(parameters['uploads']['plainTextResume'], "r", encoding='utf-8') as file:
-            plain_text_resume = file.read()
-        resume_object = Resume(plain_text_resume)
+        # ✅ Use the correctly passed plain_text_resume_file
+        with open(plain_text_resume_file, "r", encoding="utf-8") as f:
+            yaml_data = f.read()
+
+        resume_object = Resume(yaml_data)
 
         print("✅ Resume loaded successfully.")
 
@@ -116,7 +118,7 @@ def create_and_run_bot(email: str, password: str, parameters: dict, openai_api_k
         browser = init_browser()
         login_component = LinkedInAuthenticator(browser)
         gpt_answerer_component = GPTAnswerer(openai_api_key)  # ✅ Use API key from secrets.yaml
-        job_application_profile_object = JobApplicationProfile(plain_text_resume)  # ✅ Create job profile
+        job_application_profile_object = JobApplicationProfile(yaml_data)  # ✅ Create job profile
         apply_component = LinkedInJobManager(browser, gpt_answerer_component, job_application_profile_object, resume_generator_manager)
 
         print("🤖 Setting up LinkedIn Bot...")
@@ -154,7 +156,8 @@ def main(resume: Path = None):
         parameters['outputFileDirectory'] = output_folder
         
         print("🚀 Launching job application bot...")
-        create_and_run_bot(email, password, parameters, openai_api_key)
+        create_and_run_bot(email, password, parameters, openai_api_key, plain_text_resume_file)  # ✅ Pass it explicitly
+
     except Exception as e:
         print(f"❌ Error: {e}")
 
